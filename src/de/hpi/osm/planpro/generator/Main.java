@@ -16,6 +16,153 @@ public class Main {
 	private static ArrayList<Signal> signals = new ArrayList<>();
 
 	public static void main(final String[] args) {
+		
+		if (args.length > 0 && args[0].equals("--non-interactive")) {
+			non_interactive();
+		} else {
+			interactive();
+		}
+		
+		
+	}
+	
+	private static void non_interactive() {
+		try (final BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
+				String command = "";
+				while (command != null && !command.equals("generate") && !command.equals("exit")) {
+					command = reader.readLine();
+					boolean isValid = false;
+					
+					if (command == null) {
+						break;
+					}
+					
+					if (command.isEmpty()) {
+						continue;
+					} else if (command.matches("node [a-zA-Z_0-9]+ -?\\d+\\.\\d+ -?\\d+\\.\\d+( [a-zA-Z_0-9]+)?")) {
+						final String[] splits = command.split(" ");
+						final String id = splits[1];
+						// Coordinates + shift in DB.Ref coordinate system
+						final double x = Double.parseDouble(splits[2]) + 4533770.0;
+						final double y = Double.parseDouble(splits[3]) + 5625780.0;
+						String description = "";
+						if (splits.length > 4) {
+							description = splits[4];
+						}
+						if (nodes.stream().anyMatch(node -> node.getId().equals(id))) {
+							System.out.println("Node with id " + id + " already exists. Please use a different id.");
+						} else {
+							isValid = true;
+							final Node n = new Node(id, x, y, description);
+							nodes.add(n);
+						}
+					} else if (command.matches("edge [a-zA-Z_0-9]+ [a-zA-Z_0-9]+")) {
+						final String[] splits = command.split(" ");
+						final String nodeAID = splits[1];
+						final String nodeBID = splits[2];
+
+						final Node nodeA = nodes.stream().filter(node -> node.getId().equals(nodeAID)).findAny()
+								.orElse(null);
+						final Node nodeB = nodes.stream().filter(node -> node.getId().equals(nodeBID)).findAny()
+								.orElse(null);
+						if (nodeA == null) {
+							System.out.println("Node with ID " + nodeAID + " does not exists. Please create it first.");
+						} else if (nodeB == null) {
+							System.out.println("Node with ID " + nodeBID + " does not exists. Please create it first.");
+						} else {
+							// Edges are bidirectional
+							final boolean alreadyConnected = nodeA.getConnectedNodes().stream()
+									.anyMatch(connectedNode -> connectedNode.getId().equals(nodeB.getId()));
+							if (alreadyConnected) {
+								System.out.println(
+										"The nodes " + nodeAID + " and " + nodeBID + " are already connected.");
+							} else {
+								isValid = true;
+								final Edge e = new Edge(nodeA, nodeB);
+								edges.add(e);
+								nodeA.getConnectedNodes().add(nodeB);
+								nodeB.getConnectedNodes().add(nodeA);
+							}
+						}
+					} else if (command.matches("signal [a-zA-Z_0-9]+ [a-zA-Z_0-9]+ -?\\d+\\.\\d+ .+ .+")) {
+						final String[] splits = command.split(" ");
+						final String nodeAID = splits[1];
+						final String nodeBID = splits[2];
+						double distance = Double.parseDouble(splits[3]);
+						final String function = splits[4];
+						final String kind = splits[5];
+						if (!Signal.supportedFunctions.contains(function)) {
+							System.out.println("Function \"" + function + "\" is not supported. Choose any from "
+									+ String.join(",", Signal.supportedFunctions));
+						} else if (!Signal.supportedKinds.contains(kind)) {
+							System.out.println("Kind \"" + kind + "\" is not supported. Choose any from "
+									+ String.join(",", Signal.supportedKinds));
+						} else {
+							final Node nodeA = nodes.stream().filter(node -> node.getId().equals(nodeAID)).findAny()
+									.orElse(null);
+							final Node nodeB = nodes.stream().filter(node -> node.getId().equals(nodeBID)).findAny()
+									.orElse(null);
+							if (nodeA == null) {
+								System.out.println(
+										"Node with ID " + nodeAID + " does not exists. Please create it first.");
+							} else if (nodeB == null) {
+								System.out.println(
+										"Node with ID " + nodeBID + " does not exists. Please create it first.");
+							} else {
+								final Edge edge = edges.stream()
+										.filter(e -> e.getNodeA().equals(nodeA) && e.getNodeB().equals(nodeB)
+												|| e.getNodeA().equals(nodeB) && e.getNodeB().equals(nodeA))
+										.findAny().orElse(null);
+								if (edge == null) {
+									System.out.println("Node " + nodeAID + " and node " + nodeBID
+											+ " are not connected. Create edge first.");
+								} else {
+									if (distance > edge.getLength()) {
+										System.out.println(
+												"Distance is greater than edge length. Choose a smaller distance.");
+									} else {
+										isValid = true;
+										String effectiveDirection = "in";
+										if (edge.getNodeA().equals(nodeB) && edge.getNodeB().equals(nodeA)) {
+											effectiveDirection = "gegen";
+											distance = edge.getLength() - distance;
+										}
+										final Signal signal = new Signal(null, edge, distance, effectiveDirection,
+												function, kind);
+										signals.add(signal);
+									}
+								}
+							}
+						}
+
+					} else if (!command.equals("generate") && !command.equals("exit")) {
+						System.out.println("Command does not exists.");
+					}
+					
+					if (!isValid) {
+						System.err.println("Input data is invalid");
+					}
+				}
+				
+				
+				
+				final ArrayList<Route> routes = new ArrayList<>();
+				final Route route = new Route(edges);
+				signals.forEach(signal -> signal.setRoute(route));
+				routes.add(route);
+
+				final ArrayList<RunningTrack> runningTracks = RunningTrack.generateRunningTracks(nodes, edges, signals);
+
+				final Generator g = new Generator(nodes, edges, signals, routes, runningTracks);
+				g.generateToStdout();
+				
+			} catch (final IOException e) {
+				e.printStackTrace();
+			}
+		
+	}
+	
+	private static void interactive() {
 		System.out.println("Welcome to the PlanPro Generator");
 		System.out.println("Usage:");
 		System.out.println("Create a node (end or point): node <id> <x> <y> <description>");

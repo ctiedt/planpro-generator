@@ -3,6 +3,7 @@ package de.hpi.osm.planpro.generator;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -47,6 +48,40 @@ public class Generator {
 
 	public void generate(final String filename) {
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename + ".ppxml"))) {
+			final ArrayList<String> uuids = new ArrayList<>();
+			Boilerplate.generatePrefix(writer);
+
+			final String aussenUUID = Boilerplate.generateAussenelementansteuerung(writer);
+			uuids.add(aussenUUID);
+
+			uuids.addAll(this.generateNodes(this.nodes));
+			uuids.addAll(this.generateEdges(this.edges));
+			uuids.addAll(this.generateSignals(this.signals));
+			uuids.addAll(this.generateRoutes(this.routes));
+			uuids.addAll(this.generateRunningTracks(this.runningTracks));
+
+			// Order of elements in XML is relevant! (Probably alphabetical)
+			this.writeArrayList(writer, this.fstrFahrwege);
+			this.writeArrayList(writer, this.geoKanten);
+			this.writeArrayList(writer, this.geoKnoten);
+			this.writeArrayList(writer, this.geoPunkte);
+			this.writeArrayList(writer, this.signale);
+			this.writeArrayList(writer, this.stellelemente);
+			this.writeArrayList(writer, this.strecken);
+			this.writeArrayList(writer, this.topKanten);
+			this.writeArrayList(writer, this.topKnoten);
+
+			final String unterbringungUUID = Boilerplate.generateUnterbringung(writer);
+			uuids.add(unterbringungUUID);
+
+			Boilerplate.generateSuffix(writer, uuids);
+		} catch (final IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void generateToStdout() {
+		try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(System.out))) {
 			final ArrayList<String> uuids = new ArrayList<>();
 			Boilerplate.generatePrefix(writer);
 
