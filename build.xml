@@ -20,7 +20,11 @@
   <target name="dist" depends="compile"
         description="generate the distribution">
     <!-- Put everything in ${build} into the MyProject-${DSTAMP}.jar file -->
-    <jar jarfile="ppg.jar" basedir="${build}"/>
+    <jar jarfile="ppg.jar" basedir="${build}">
+      <manifest>
+        <attribute name="Main-Class" value="de.hpi.osm.planpro.generator.Main"/>
+      </manifest>
+    </jar>
   </target>
 
   <target name="clean"
